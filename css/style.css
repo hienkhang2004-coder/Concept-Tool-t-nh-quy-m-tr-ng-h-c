@@ -1228,3 +1228,115 @@ tbody tr:hover td { background: var(--pri-bg2); }
   transition: all 0.15s; vertical-align: middle; padding: 0;
 }
 .btn-del-slide:hover { background: var(--red-bg); color: var(--red); }
+
+/* ─── Drag & Drop Slide Reorder ─── */
+.slide-group {
+  transition: transform 0.25s cubic-bezier(0.2,0,0,1), box-shadow 0.25s ease, opacity 0.2s ease;
+  cursor: default;
+}
+.slide-group[draggable="true"] { cursor: grab; }
+.slide-group[draggable="true"]:active { cursor: grabbing; }
+
+.slide-group.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+}
+.slide-group.drag-over {
+  box-shadow: 0 -3px 0 0 var(--accent) inset;
+}
+.slide-group.drag-over tr:first-child td {
+  border-top: 2px solid var(--accent) !important;
+}
+
+/* Drag handle */
+.drag-handle {
+  display: inline-block; width: 20px; height: 20px;
+  text-align: center; line-height: 20px;
+  font-size: 14px; color: var(--text-3);
+  cursor: grab; vertical-align: middle;
+  margin-right: 4px; border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  user-select: none;
+}
+.drag-handle:hover { color: var(--accent); background: var(--accent-bg); }
+
+/* Data slide badge */
+.data-badge {
+  display: inline-block; padding: 1px 6px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  background: var(--accent); color: #fff;
+  border-radius: 3px; margin-left: 4px; vertical-align: middle;
+}
+.data-slide-group tr td:first-child {
+  border-left: 3px solid var(--accent) !important;
+}
+
+/* ─── Sync / Collab UI ─── */
+.sync-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 6px;
+  background: var(--bg-2); font-size: 11px; color: var(--text-3);
+}
+.sync-users { display: flex; gap: -4px; }
+.sync-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 10px; font-weight: 700; color: #fff;
+  border: 2px solid var(--bg-1); margin-left: -6px;
+  transition: transform 0.2s;
+}
+.sync-avatar:first-child { margin-left: 0; }
+.sync-avatar:hover { transform: scale(1.2); z-index: 2; }
+.sync-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+.sync-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+.sync-dot.offline { background: var(--text-3); }
+.sync-label { font-size: 11px; white-space: nowrap; }
+.sync-room-id {
+  font-size: 10px; color: var(--accent); font-weight: 600;
+  max-width: 100px; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Room dialog */
+.room-dialog-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.room-dialog {
+  background: var(--bg-1); border-radius: 12px;
+  padding: 24px 28px; width: 380px; max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: slideUp 0.25s cubic-bezier(0.2,0,0,1);
+}
+.room-dialog h3 { margin: 0 0 4px; font-size: 16px; }
+.room-input {
+  padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; background: var(--bg-2);
+  color: var(--text-1); outline: none; box-sizing: border-box;
+}
+.room-input:focus { border-color: var(--accent); }
+
+/* Sync toast */
+#sync-toast-container {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%); z-index: 9998;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.sync-toast {
+  padding: 8px 16px; border-radius: 8px;
+  background: var(--bg-1); color: var(--text-1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border-left: 3px solid var(--accent);
+  font-size: 12px; white-space: nowrap;
+  opacity: 0; transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.sync-toast.show { opacity: 1; transform: translateY(0); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }

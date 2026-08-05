@@ -778,8 +778,11 @@ async function insertDataSlide() {
     title: 'TỔNG QUAN DỰ ÁN – QUY MÔ',
     section: 'Data slide (auto)',
     isDivider: false,
+    isDataSlide: true,
     imgSlots: [],
     textBlocks: [],
+    autoFields: [],
+    note: '',
   });
   buildPresentTable(SLIDES);
   alert('Đã chèn slide Quy mô vào cuối template (slide ' + newNum + ')');
