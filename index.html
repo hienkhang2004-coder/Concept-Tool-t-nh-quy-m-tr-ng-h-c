@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concept² — Tool tính quy mô trường học</title>
+<meta name="description" content="Concept² — Tool tính quy mô & lập concept trình bày cho trường học theo tiêu chuẩn Việt Nam">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="libs/exceljs.min.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════ NAVIGATION ═══════════════════════ -->
+<nav>
+  <div class="brand">
+    <div class="brand-icon"><i data-lucide="building-2" style="width:20px;height:20px"></i></div>
+    <div>
+      <div class="brand-name">Concept²</div>
+      <div class="brand-sub">Tool tính quy mô trường học</div>
+    </div>
+  </div>
+
+  <div class="step-wizard">
+    <div class="step-item active" data-page="p1" onclick="goPage('p1',this)">
+      <span class="step-number">1</span>
+      <span class="step-label">Thông tin đầu vào</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item" data-page="p2" onclick="goPage('p2',this)">
+      <span class="step-number">2</span>
+      <span class="step-label">Quy mô nội suy</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item" data-page="p3" onclick="goPage('p3',this)">
+      <span class="step-number">3</span>
+      <span class="step-label">Trình bày</span>
+    </div>
+  </div>
+
+  <div class="nav-right">
+    <button class="btn btn-ghost" onclick="newProject()" title="Tạo dự án mới">+ Mới</button>
+    <button class="btn btn-ghost" onclick="openProject()" title="Mở file .json">Mở</button>
+    <button class="btn btn-ghost" onclick="saveProject()" title="Lưu ra file .json">Lưu</button>
+    <button class="btn btn-ghost" onclick="toggleTheme()" id="theme-btn" title="Đổi giao diện"><i data-lucide="moon" style="width:14px;height:14px"></i></button>
+    <button class="btn btn-ghost" onclick="exportExcel()"><i data-lucide="download" style="width:14px;height:14px"></i> Excel</button>
+    <button class="btn btn-primary" onclick="goPage('p3',document.querySelector('[data-page=p3]'));buildPresentTable()">Xuất PPTX →</button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════ PAGE 1: ĐẦU VÀO ═══════════════════════ -->
+<div id="p1" class="page p1 active">
+  <div class="p1-left">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Thông tin dự án</h2>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label for="tenDA">Tên dự án</label>
+          <input type="text" id="tenDA" placeholder="VD: Trường THPT N9 – Đông Hội" oninput="syncAndCalc()">
+        </div>
+        <div class="field">
+          <label for="diaDiem">Địa điểm</label>
+          <input type="text" id="diaDiem" placeholder="VD: Huyện Đông Anh, TP. Hà Nội" oninput="syncAndCalc()">
+        </div>
+        <div class="field">
+          <label for="chuDT">Chủ đầu tư</label>
+          <input type="text" id="chuDT" placeholder="VD: UBND Huyện Đông Anh" oninput="syncAndCalc()">
+        </div>
+        <div class="field">
+          <label for="dvTK">Đơn vị thiết kế</label>
+          <input type="text" id="dvTK" placeholder="VD: Studio ABC Architecture" oninput="syncAndCalc()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Thông số kỹ thuật</h2>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label for="capTruong">① Cấp trường học</label>
+          <select id="capTruong" onchange="syncAndCalc()">
+            <option value="mn">Mầm non</option>
+            <option value="th">Tiểu học (Lớp 1–5)</option>
+            <option value="thcs">THCS (Lớp 6–9)</option>
+            <option value="thpt" selected>THPT (Lớp 10–12)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="chuanQG">② Chuẩn Quốc gia <span class="label-ref">TT17/2018</span></label>
+          <select id="chuanQG" onchange="syncAndCalc()">
+            <option value="m1">Chuẩn QG Mức 1</option>
+            <option value="m2" selected>Chuẩn QG Mức 2</option>
+            <option value="chua">— Chưa đạt chuẩn</option>
+          </select>
+          <div id="lv-badge" class="lv-badge lv-m2"><span class="dot dot-t"></span><span id="lv-txt">Chuẩn QG Mức 2</span></div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="dtDat">③ Diện tích đất (m²)</label>
+            <input type="number" id="dtDat" value="26474" min="300" step="50" oninput="syncAndCalc()">
+          </div>
+          <div class="field">
+            <label for="loaiDT">④ Loại đô thị</label>
+            <select id="loaiDT" onchange="syncAndCalc()">
+              <option value="db">Đặc biệt — HN, TP.HCM</option>
+              <option value="1">Loại I</option>
+              <option value="2">Loại II – III</option>
+              <option value="nt">Nông thôn</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="pctBT">⑤ Tỷ lệ bán trú (%)</label>
+            <input type="number" id="pctBT" value="70" min="0" max="100" step="5" oninput="syncAndCalc()">
+          </div>
+          <div class="field">
+            <label for="dtXD">⑥ DT xây dựng (m²)</label>
+            <input type="number" id="dtXD" value="3195" min="0" step="10" oninput="syncAndCalc()">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="dtSan">⑦ DT sàn nổi (m²)</label>
+            <input type="number" id="dtSan" value="10473" min="0" step="10" oninput="syncAndCalc()">
+          </div>
+          <div class="field">
+            <label for="soTang">⑧ Số tầng cao</label>
+            <input type="number" id="soTang" value="4" min="1" max="10" oninput="syncAndCalc()">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0.5rem">
+      <div class="card-header"><h2 class="card-title">Dự án gần đây</h2></div>
+      <div class="card-body" id="recent-list" style="padding-top:0.5rem"></div>
+    </div>
+  </div>
+
+  <div class="p1-right">
+    <!-- Metrics -->
+    <div class="metrics" id="metrics-p1">
+      <div class="mc lit" id="mc1"><div class="mc-ico"><i data-lucide="users"></i></div><div class="mc-detail"><div class="mc-lbl">Học sinh</div><div class="mc-val" id="m-hs1">0</div><div class="mc-unit">người</div></div></div>
+      <div class="mc lit" id="mc2"><div class="mc-ico"><i data-lucide="layout-grid"></i></div><div class="mc-detail"><div class="mc-lbl">Số lớp</div><div class="mc-val" id="m-lop1">0</div><div class="mc-unit">lớp</div></div></div>
+      <div class="mc lit" id="mc3"><div class="mc-ico"><i data-lucide="user-check"></i></div><div class="mc-detail"><div class="mc-lbl">CBGV &amp; NV</div><div class="mc-val" id="m-cbgv1">0</div><div class="mc-unit">người</div></div></div>
+      <div class="mc lit" id="mc4"><div class="mc-ico"><i data-lucide="ruler"></i></div><div class="mc-detail"><div class="mc-lbl">DT sàn yêu cầu</div><div class="mc-val" id="m-san1">0</div><div class="mc-unit">m²</div></div></div>
+      <div class="mc lit" id="mc5"><div class="mc-ico"><i data-lucide="bike"></i></div><div class="mc-detail"><div class="mc-lbl">Bãi đỗ xe</div><div class="mc-val" id="m-xe1">0</div><div class="mc-unit">m²</div></div></div>
+    </div>
+
+    <!-- Gauge -->
+    <div class="card">
+      <div class="card-body" style="text-align:center">
+        <div class="gauge-box">
+          <div class="gauge-lbl">Mật độ xây dựng</div>
+          <svg width="160" height="90" viewBox="0 0 160 90" style="display:block;margin:0 auto">
+            <path d="M12,84 A68,68 0 0,1 148,84" fill="none" stroke="#E8ECF4" stroke-width="12" stroke-linecap="round"></path>
+            <path id="g-arc" d="M12,84 A68,68 0 0,1 148,84" fill="none" stroke="#00B894" stroke-width="12" stroke-linecap="round" stroke-dasharray="214" stroke-dashoffset="214" style="transition: 0.8s ease-out"></path>
+            <text x="80" y="78" text-anchor="middle" font-family="Plus Jakarta Sans" font-size="20" font-weight="800" fill="#00B894" id="g-txt">0.0%</text>
+          </svg>
+          <div class="gauge-num" id="g-num">0.0%</div>
+          <div class="gauge-sub" id="g-sub">✓ Đạt QCVN (≤40%)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Tóm tắt thông tin dự án</h2>
+      </div>
+      <div class="card-body">
+        <div id="summary-grid" class="summary-grid">
+          <div class="sg-label">Tên dự án</div><div class="sg-value" id="s-ten">–</div>
+          <div class="sg-label">Địa điểm</div><div class="sg-value" id="s-dia">–</div>
+          <div class="sg-label">Chủ đầu tư</div><div class="sg-value" id="s-chu">–</div>
+          <div class="sg-label">Đơn vị TK</div><div class="sg-value" id="s-dv">–</div>
+          <div class="sg-label">Cấp trường</div><div class="sg-value" id="s-cap">THPT</div>
+          <div class="sg-label">Chuẩn QG</div><div class="sg-value" id="s-chuan">Chuẩn QG Mức 2</div>
+          <div class="sg-label">Diện tích đất</div><div class="sg-value" id="s-dt">26.474 m²</div>
+          <div class="sg-label">DT xây dựng</div><div class="sg-value" id="s-xd">0 m² (0.0%)</div>
+          <div class="sg-label">DT sàn nổi</div><div class="sg-value" id="s-san">0 m²</div>
+          <div class="sg-label">Số tầng</div><div class="sg-value" id="s-tang">4 tầng</div>
+          <div class="sg-label">Mật độ XD</div><div class="sg-value" id="s-matdo">0.0%</div>
+          <div class="sg-label">Bán trú</div><div class="sg-value" id="s-bantru">70% = 0 HS</div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-ghost" onclick="goPage('p2',document.querySelector('[data-page=p2]'))">Xem Quy mô →</button>
+          <button class="btn btn-ghost" onclick="goPage('p3',document.querySelector('[data-page=p3]'));buildPresentTable()">Đến Trình bày →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-note" id="info-note">
+      <b>Chuẩn QG Mức 2</b> · THPT<br>0 học sinh · 0 lớp · 6m²/HS · Đô thị Đặc biệt
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="info-note" style="margin:0">
+          <b>Hướng dẫn:</b> Điền đầy đủ thông tin bên trái → Chuyển sang tab <b>Quy mô nội suy</b> để xem chi tiết tính toán → Tab <b>Trình bày</b> để ghép ảnh và xuất PPTX.
+        </div>
+      </div>
+    </div>
+
+    <div class="legal-footer">TT13/2020 · TT17/2018 · TT16/2017 · NĐ152/2017<br>TCVN 8794:2011 · QCVN 01:2021/BXD</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2: QUY MÔ ═══════════════════════ -->
+<div id="p2" class="page" style="flex-direction:column;overflow:hidden">
+  <div class="p2-header">
+    <div class="metrics" id="metrics-p2">
+      <div class="mc lit" id="mc1b"><div class="mc-ico"><i data-lucide="users"></i></div><div class="mc-detail"><div class="mc-lbl">Học sinh</div><div class="mc-val" id="m-hs2">0</div><div class="mc-unit">người</div></div></div>
+      <div class="mc lit" id="mc2b"><div class="mc-ico"><i data-lucide="layout-grid"></i></div><div class="mc-detail"><div class="mc-lbl">Số lớp</div><div class="mc-val" id="m-lop2">0</div><div class="mc-unit">lớp</div></div></div>
+      <div class="mc lit" id="mc3b"><div class="mc-ico"><i data-lucide="user-check"></i></div><div class="mc-detail"><div class="mc-lbl">CBGV &amp; NV</div><div class="mc-val" id="m-cbgv2">0</div><div class="mc-unit">người</div></div></div>
+      <div class="mc lit" id="mc4b"><div class="mc-ico"><i data-lucide="ruler"></i></div><div class="mc-detail"><div class="mc-lbl">DT sàn YC</div><div class="mc-val" id="m-san2">0</div><div class="mc-unit">m²</div></div></div>
+      <div class="mc lit" id="mc5b"><div class="mc-ico"><i data-lucide="bike"></i></div><div class="mc-detail"><div class="mc-lbl">Bãi đỗ xe</div><div class="mc-val" id="m-xe2">0</div><div class="mc-unit">m²</div></div></div>
+    </div>
+  </div>
+
+  <div class="p2-body">
+    <!-- Charts -->
+    <div class="chart-row">
+      <div class="chart-card"><div class="chart-title">Cơ cấu sử dụng đất</div><canvas id="chart-land" width="200" height="200"></canvas><div class="chart-legend" id="legend-land"></div></div>
+      <div class="chart-card"><div class="chart-title">Cơ cấu nhân sự</div><canvas id="chart-staff" width="200" height="200"></canvas><div class="chart-legend" id="legend-staff"></div></div>
+      <div class="chart-card"><div class="chart-title">Tỉ lệ diện tích sàn</div><canvas id="chart-floor" width="200" height="200"></canvas><div class="chart-legend" id="legend-floor"></div></div>
+    </div>
+    <div class="table-card">
+      <div class="tabs-row">
+        <button class="tb active" onclick="switchTab(event,'t-hs')">Học sinh &amp; Lớp</button>
+        <button class="tb" onclick="switchTab(event,'t-cbgv')">CBGV &amp; Nhân viên</button>
+        <button class="tb" onclick="switchTab(event,'t-phong')">Phòng chức năng</button>
+        <button class="tb" onclick="switchTab(event,'t-xe')">Bãi đỗ xe</button>
+        <button class="tb" onclick="switchTab(event,'t-dat')">Cơ cấu đất</button>
+        <button class="tb" onclick="switchTab(event,'t-phap')">Pháp lý</button>
+      </div>
+      <div class="tbl-wrap">
+        <div id="t-hs" class="pane active"><table id="tbl-hs"><thead><tr><th>STT</th><th>Chỉ tiêu</th><th>Kết quả</th><th>Đơn vị</th><th>Ghi chú</th><th>Căn cứ</th></tr></thead><tbody></tbody></table></div>
+        <div id="t-cbgv" class="pane"><table id="tbl-cbgv"><thead><tr><th>STT</th><th>Chức danh</th><th>Số lượng</th><th>Đơn vị</th><th>Ghi chú</th><th>Căn cứ</th></tr></thead><tbody></tbody></table></div>
+        <div id="t-phong" class="pane"><table id="tbl-phong"><thead><tr><th>STT</th><th>Loại phòng</th><th>Số phòng</th><th>DT/phòng (m²)</th><th>Tổng DT (m²)</th><th>Trạng thái</th><th>Căn cứ</th></tr></thead><tbody></tbody></table></div>
+        <div id="t-xe" class="pane"><table id="tbl-xe"><thead><tr><th>STT</th><th>Đối tượng</th><th>Số xe</th><th>m²/xe</th><th>DT thuần</th><th>DT×1.3</th><th>Căn cứ</th></tr></thead><tbody></tbody></table></div>
+        <div id="t-dat" class="pane"><table id="tbl-dat"><thead><tr><th>STT</th><th>Chỉ tiêu</th><th>Giá trị</th><th>Đơn vị</th><th>Hệ số/Tỷ lệ</th><th>Yêu cầu</th><th>Căn cứ</th></tr></thead><tbody></tbody></table></div>
+        <div id="t-phap" class="pane"><table id="tbl-phap"><thead><tr><th>STT</th><th>Số hiệu</th><th>Ban hành</th><th>Tên văn bản</th><th>Nội dung áp dụng</th><th>Tình trạng</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div class="info-note" id="note-legal"><b>Chuẩn QG Mức 2</b> · THPT · Tiêu chuẩn 6m²/HS · Sĩ số 45HS/lớp · Bán trú 70%</div>
+    <div class="flow-cta">
+      <button class="btn btn-ghost" onclick="exportDataSlide('16x9')" style="margin-right:6px">Xuất slide Quy mô (16:9)</button>
+      <button class="btn btn-ghost" onclick="exportDataSlide('A3')" style="margin-right:6px">Xuất slide Quy mô (A3)</button>
+      <button class="btn btn-primary btn-cta" onclick="goPage('p3',document.querySelector('[data-page=p3]'))">Tiếp tục: Xuất bài trình bày →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 3: TRÌNH BÀY ═══════════════════════ -->
+<div id="p3" class="page p3">
+  <div class="p3-topbar">
+    <h2>Trình bày — Ghép ảnh theo mẫu</h2>
+    <label class="upload-zone">
+      <input type="file" id="pptx-upload" accept=".pptx" onchange="loadPptx(this)">
+      Upload file .pptx mẫu
+    </label>
+    <label class="upload-zone" id="img-folder-btn" style="display:none">
+      <input type="file" id="img-folder" multiple accept="image/*" onchange="loadImageFolder(this)">
+      Load thư mục ảnh
+    </label>
+    <div id="pptx-info" class="pptx-info">Chưa có file mẫu</div>
+    <div class="p3-actions">
+      <button class="btn btn-ghost" onclick="insertDataSlide()" id="btn-insert-data" style="display:none">Chèn slide Quy mô</button>
+      <button class="btn btn-ghost" onclick="resetPresent()">Reset</button>
+      <button class="btn btn-success" onclick="exportPptx()">Xuất PPTX</button>
+    </div>
+  </div>
+
+  <div class="p3-body">
+    <div id="p3-empty" class="p3-empty">
+      <div class="empty-icon"><i data-lucide="file-text" style="width:48px;height:48px;color:var(--text-3)"></i></div>
+      <div class="empty-title">Upload file .pptx mẫu để bắt đầu</div>
+      <div class="empty-desc">Web sẽ đọc cấu trúc slide, tạo bảng quản lý ảnh và ghép số liệu từ module Quy mô</div>
+    </div>
+
+    <div id="p3-content" style="display:none">
+      <div class="p3-info-row">
+        <div>
+          <span class="p3-info-text" id="slide-count-info">0 slides</span>
+          <span class="p3-info-sep">·</span>
+          <span class="p3-info-text" id="img-done-info">0/0 ảnh đã upload</span>
+        </div>
+        <button class="btn btn-ghost" onclick="downloadCodeList()">Tải danh sách mã ảnh</button>
+      </div>
+
+      <table class="slide-table">
+        <thead>
+          <tr>
+            <th style="width:220px">Trang / Slide</th>
+            <th style="width:140px">Ảnh mẫu (thumbnail)</th>
+            <th style="width:120px">Mã file ảnh</th>
+            <th style="width:160px">Ảnh thực tế (upload)</th>
+            <th>Nội dung bổ sung / Số liệu tự điền</th>
+          </tr>
+        </thead>
+        <tbody id="slide-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="export-bar" id="export-bar" style="display:none">
+    <div class="export-info" id="export-info">Sẵn sàng xuất file</div>
+    <div class="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+    <button class="btn btn-primary" onclick="exportPptx()">Xuất file PPTX</button>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/data.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/present.js"></script>
+<script src="js/excel.js"></script>
+<script src="js/app.js"></script>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>
