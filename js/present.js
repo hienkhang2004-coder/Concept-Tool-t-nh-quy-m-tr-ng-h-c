@@ -9,6 +9,39 @@ let IMG_MAP = {}; // code -> {dataUrl, file}
 // NOTE: DEFAULT_TEMPLATE and AUTO_FIELD_LABELS are defined in data.js
 // NOTE: getAutoValue() is defined in calc.js
 
+// Built-in template paths
+const BUILTIN_TEMPLATES = {
+  '16x9': { path: 'template_16x9.pptx', label: 'Template 16:9' },
+  'a3':   { path: 'template_A3.pptx',   label: 'Template A3' },
+};
+
+async function loadBuiltinTemplate(key, fromRemote) {
+  const tpl = BUILTIN_TEMPLATES[key];
+  if (!tpl) { alert('Template không tồn tại'); return; }
+
+  document.getElementById('pptx-info').textContent = 'Đang tải ' + tpl.label + '…';
+
+  // Highlight active button
+  document.querySelectorAll('.template-selector .btn').forEach(b => b.classList.remove('btn-active'));
+  const btn = document.getElementById('btn-tpl-' + key);
+  if (btn) btn.classList.add('btn-active');
+
+  try {
+    const response = await fetch(tpl.path);
+    if (!response.ok) throw new Error('Không tìm thấy file ' + tpl.path);
+    const buf = await response.arrayBuffer();
+    await parsePptxFromBuffer(buf, tpl.label);
+
+    // Only broadcast if this was a LOCAL click, not a remote sync
+    if (!fromRemote && typeof SYNC_ACTIVE !== 'undefined' && SYNC_ACTIVE && typeof syncWrite === 'function') {
+      syncWrite('template', { builtinKey: key, uploadedAt: Date.now() });
+    }
+  } catch (e) {
+    console.error('[Template] Load error:', e);
+    document.getElementById('pptx-info').textContent = 'Lỗi: ' + e.message;
+  }
+}
+
 function buildPresentTable(template){
   SLIDES=template||DEFAULT_TEMPLATE;
   document.getElementById('p3-empty').style.display='none';
@@ -73,144 +106,211 @@ function buildPresentTable(template){
       }
     });
 
-    const hasImgs=slide.imgSlots.length>0;
-    const rowspan=Math.max(1,slide.imgSlots.length);
-
-    // Data slide badge
+    const imgCount = slide.imgSlots.length;
+    const imgDone = slide.imgSlots.filter(s => IMG_MAP[s.code]?.dataUrl).length;
+    const tbCount = slide.textBlocks?.length || 0;
     const dataBadge = slide.isDataSlide ? '<span class="data-badge">QUY MÔ</span>' : '';
     const dragHandle = '<span class="drag-handle" title="Kéo để đổi vị trí">⠿</span>';
 
-    slide.imgSlots.forEach((slot,ii)=>{
-      const tr=document.createElement('tr');
-      tr.id=`row-${slide.slideNum}-${ii}`;
-      tr.dataset.slideIdx=si;
-      tr.dataset.slotIdx=ii;
+    const tr = document.createElement('tr');
+    tr.className = 'slide-row';
+    tr.id = `srow-${si}`;
+    tr.dataset.slideIdx = si;
 
-      // Col 1: slide name (rowspan)
-      if(ii===0){
-        const td1=document.createElement('td');
-        td1.rowSpan=rowspan||1;
-        td1.className='slide-name';
-        td1.innerHTML=`${dragHandle}<div class="slide-num">Slide ${slide.slideNum} ${dataBadge}<button class="btn-del-slide" onclick="deleteSlide(${si})" title="Xóa slide này">✕</button></div><div class="slide-title-text">${slide.title}</div>${slide.section?`<div class="slide-section">${slide.section}</div>`:''}`;
-        tr.appendChild(td1);
-      }
+    // Col 1: Drag + Slide name
+    const td1 = document.createElement('td');
+    td1.className = 'slide-name';
+    td1.innerHTML = `${dragHandle}<div class="slide-num">Slide ${slide.slideNum} ${dataBadge}<button class="btn-del-slide" onclick="event.stopPropagation();deleteSlide(${si})" title="Xóa slide">✕</button></div><div class="slide-title-text">${slide.title}</div>`;
+    tr.appendChild(td1);
 
-      if(hasImgs){
-        // Col 2: thumb + dimensions + drag zone
-        const td2=document.createElement('td');
+    // Col 2: PPTX thumbnail + dimension info (clickable → opens modal)
+    const td2 = document.createElement('td');
+    td2.className = 'slide-col-thumbs';
+    if (imgCount > 0) {
+      const thumbsHtml = slide.imgSlots.map((slot, ii) => {
+        const done = IMG_MAP[slot.code]?.dataUrl;
         const dimHtml = slot.pxW && slot.pxH
-          ? `<div class="img-dim" title="Kích thước ảnh trong PPTX">
-               <span class="dim-screen">${slot.pxW} × ${slot.pxH} px</span>
-               <span class="dim-print">PTS 300dpi: ${slot.px300W} × ${slot.px300H}</span>
-               <span class="dim-mm">${slot.mmW} × ${slot.mmH} mm</span>
+          ? `<div class="dim-panel">
+               <div class="dim-line"><strong>${slot.pxW} × ${slot.pxH}</strong> px</div>
+               <div class="dim-line">PTS 300dpi:<br>${slot.px300W} × ${slot.px300H}</div>
+               <div class="dim-line">${slot.mmW} × ${slot.mmH} mm</div>
              </div>`
           : '';
-        td2.innerHTML=`<div class="img-slot drop-zone" data-si="${si}" data-ii="${ii}">
-          <div class="thumb-wrap" id="thumb-${slide.slideNum}-${ii}" onclick="previewImage(${si},${ii})">
-            <span class="thumb-placeholder">Kéo ảnh thả vào đây</span>
+        return `<div class="slot-card" onclick="openImageModal(${si})">
+          <div class="slot-card-thumb" id="thumb-${slide.slideNum}-${ii}">
+            ${done
+              ? `<img src="${done}" alt="${slot.code}">`
+              : `<span class="thumb-placeholder">Kéo ảnh thả vào đây</span>`}
           </div>
-          <div style="font-size:10px;color:var(--text-3);max-width:130px">${slot.label}</div>
           ${dimHtml}
-          <span class="quality-badge" id="qbadge-${slide.slideNum}-${ii}"></span>
+          <div class="slot-card-label">${slot.label || ''}</div>
         </div>`;
-        tr.appendChild(td2);
-
-        // Col 3: code
-        const td3=document.createElement('td');
-        td3.innerHTML=`<span class="code-tag" title="Click để copy" onclick="navigator.clipboard.writeText('${slot.code}')">${slot.code}</span>`;
-        tr.appendChild(td3);
-
-        // Col 4: upload + move
-        const td4=document.createElement('td');
-        td4.innerHTML=`<div class="slot-upload">
-          <label class="upload-btn">Chọn ảnh<input type="file" accept="image/*" onchange="loadSlotImage(this,${si},${ii})"></label>
-          <div class="move-btns">
-            <button class="move-btn" onclick="moveSlot(${si},${ii},-1)" title="Lên" ${ii===0?'disabled':''}>▲</button>
-            <button class="move-btn" onclick="moveSlot(${si},${ii},1)" title="Xuống" ${ii===slide.imgSlots.length-1?'disabled':''}>▼</button>
-          </div>
-          <span class="slot-status s-empty" id="stat-${slide.slideNum}-${ii}">Chưa có</span>
-        </div>`;
-        tr.appendChild(td4);
-      } else if(ii===0){
-        // No images placeholder
-        const td2=document.createElement('td');td2.innerHTML=`<div class="img-slot"><span style="font-size:10px;color:var(--txt3)">Không có ảnh thay thế</span></div>`;tr.appendChild(td2);
-        const td3=document.createElement('td');td3.innerHTML='–';tr.appendChild(td3);
-        const td4=document.createElement('td');td4.innerHTML='–';tr.appendChild(td4);
-      }
-
-      // Col 5: content (rowspan) — text blocks + notes
-      if(ii===0){
-        const td5=document.createElement('td');
-        td5.rowSpan=rowspan||1;
-        td5.className='content-cell';
-
-        // Auto tags
-        const tagsHtml=(slide.autoFields||[]).map(f=>`<span class="auto-tag">${AUTO_FIELD_LABELS[f]||f}: ${getAutoValue(f)}</span>`).join('');
-
-        // Editable text blocks from PPTX (collapsible)
-        let blocksHtml = '';
-        if (slide.textBlocks && slide.textBlocks.length > 0) {
-          blocksHtml = `<details class="text-blocks">
-            <summary class="tb-toggle">Sửa nội dung <span class="tb-count">${slide.textBlocks.length}</span></summary>
-            <div class="tb-list">
-            ${slide.textBlocks.map((tb, bi) => `
-              <div class="text-block">
-                <textarea class="tb-edit" id="tblock-${slide.slideNum}-${bi}"
-                  rows="${Math.min(Math.max(tb.text.split('\n').length, 1), 4)}"
-                  placeholder="(trống)">${tb.text}</textarea>
-              </div>
-            `).join('')}
-            </div>
-          </details>`;
-        }
-
-        td5.innerHTML=`${tagsHtml?`<div class="content-tags">${tagsHtml}</div>`:''}
-          ${blocksHtml}
-          <textarea class="content-input" id="note-${slide.slideNum}" placeholder="Ghi chú..." rows="1">${slide.note||''}</textarea>`;
-        tr.appendChild(td5);
-      }
-
-      tbdy.appendChild(tr);
-    });
-
-    // Slide with no images but needs row
-    if(!hasImgs){
-      const tr=document.createElement('tr');
-      const td1=document.createElement('td');
-      td1.className='slide-name';
-      td1.innerHTML=`${dragHandle}<div class="slide-num">Slide ${slide.slideNum} ${dataBadge}<button class="btn-del-slide" onclick="deleteSlide(${si})" title="Xóa slide này">✕</button></div><div class="slide-title-text">${slide.title}</div>${slide.section?`<div class="slide-section">${slide.section}</div>`:''}`;
-      tr.appendChild(td1);
-      const td2=document.createElement('td');td2.innerHTML='<span style="font-size:10px;color:var(--text-3)">Không có ảnh</span>';tr.appendChild(td2);
-      const td3=document.createElement('td');td3.innerHTML='–';tr.appendChild(td3);
-      const td4=document.createElement('td');td4.innerHTML='–';tr.appendChild(td4);
-      const td5=document.createElement('td');td5.className='content-cell';
-      const tagsHtml=(slide.autoFields||[]).map(f=>`<span class="auto-tag">${AUTO_FIELD_LABELS[f]||f}: ${getAutoValue(f)}</span>`).join('');
-
-      let blocksHtml = '';
-      if (slide.textBlocks && slide.textBlocks.length > 0) {
-        blocksHtml = `<details class="text-blocks">
-          <summary class="tb-toggle">Sửa nội dung <span class="tb-count">${slide.textBlocks.length}</span></summary>
-          <div class="tb-list">
-          ${slide.textBlocks.map((tb, bi) => `
-            <div class="text-block">
-              <textarea class="tb-edit" id="tblock-${slide.slideNum}-${bi}"
-                rows="${Math.min(Math.max(tb.text.split('\n').length, 1), 4)}"
-                placeholder="(trống)">${tb.text}</textarea>
-            </div>
-          `).join('')}
-          </div>
-        </details>`;
-      }
-
-      td5.innerHTML=`${tagsHtml?`<div class="content-tags">${tagsHtml}</div>`:''}
-        ${blocksHtml}
-        <textarea class="content-input" id="note-${slide.slideNum}" placeholder="Ghi chú..." rows="1">${slide.note||''}</textarea>`;
-      tr.appendChild(td5);
-      tbdy.appendChild(tr);
+      }).join('');
+      td2.innerHTML = `<div class="slot-cards-row">${thumbsHtml}</div>`;
+    } else {
+      td2.innerHTML = '<span class="text-muted">Không có ảnh</span>';
     }
+    tr.appendChild(td2);
 
+    // Col 3: Image badge (clickable → opens modal)
+    const td3 = document.createElement('td');
+    td3.className = 'slide-col-img';
+    if (imgCount > 0) {
+      td3.innerHTML = `<button class="badge-btn badge-img ${imgDone === imgCount ? 'badge-done' : ''}" onclick="openImageModal(${si})" title="Quản lý ảnh">
+        🖼 ${imgDone}/${imgCount}
+      </button>`;
+    } else {
+      td3.innerHTML = '<span class="text-muted">—</span>';
+    }
+    tr.appendChild(td3);
+
+    // Col 4: Text badge (clickable → opens modal)
+    const td4 = document.createElement('td');
+    td4.className = 'slide-col-txt';
+    if (tbCount > 0) {
+      td4.innerHTML = `<button class="badge-btn badge-txt" onclick="openTextModal(${si})" title="Sửa nội dung">
+        ✏️ ${tbCount} mục
+      </button>`;
+    } else {
+      td4.innerHTML = '<span class="text-muted">—</span>';
+    }
+    tr.appendChild(td4);
+
+    // Col 5: Note (inline short input)
+    const td5 = document.createElement('td');
+    td5.className = 'slide-col-note';
+    td5.innerHTML = `<input class="content-input note-inline" id="note-${slide.slideNum}" value="${(slide.note||'').replace(/"/g,'&quot;')}" placeholder="Ghi chú...">`;
+    tr.appendChild(td5);
+
+    tbdy.appendChild(tr);
     table.appendChild(tbdy);
   });
+}
+
+// ═══ IMAGE MODAL ═══
+function openImageModal(si) {
+  const slide = SLIDES[si];
+  if (!slide) return;
+  closeSlideModal();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'slide-modal-overlay';
+  overlay.id = 'slide-modal';
+  overlay.onclick = e => { if (e.target === overlay) closeSlideModal(); };
+
+  let slotsHtml = slide.imgSlots.map((slot, ii) => {
+    const done = IMG_MAP[slot.code]?.dataUrl;
+    const dimHtml = slot.pxW && slot.pxH
+      ? `<div class="modal-dim">${slot.pxW}×${slot.pxH}px &bull; 300dpi: ${slot.px300W}×${slot.px300H}</div>` : '';
+    return `
+      <div class="modal-slot ${done ? 'slot-done' : ''}">
+        <div class="modal-thumb drop-zone" id="mthumb-${slide.slideNum}-${ii}" data-si="${si}" data-ii="${ii}" onclick="document.getElementById('mfinput-${si}-${ii}').click()">
+          ${done
+            ? `<img src="${done}" alt="${slot.code}">`
+            : `<div class="thumb-empty">📷<br>Kéo thả hoặc click</div>`}
+        </div>
+        <div class="modal-slot-info">
+          <span class="code-tag">${slot.code}</span>
+          <span class="slot-label">${slot.label || ''}</span>
+          ${dimHtml}
+          <span class="quality-badge" id="qbadge-${slide.slideNum}-${ii}"></span>
+          <span class="slot-status ${done ? 's-done' : 's-empty'}" id="stat-${slide.slideNum}-${ii}">${done ? '✓ ' + (slot.realName || 'uploaded') : 'Chưa có'}</span>
+          <input type="file" accept="image/*" id="mfinput-${si}-${ii}" class="hidden-input" onchange="loadSlotImage(this,${si},${ii});updateModalThumb(${si},${ii})">
+        </div>
+      </div>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div class="slide-modal">
+      <div class="modal-header">
+        <h3>🖼 Ảnh — Slide ${slide.slideNum}: ${slide.title}</h3>
+        <button class="modal-close" onclick="closeSlideModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        ${slotsHtml || '<p class="text-muted">Slide này không có ảnh thay thế</p>'}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  initDropZones();
+}
+
+function updateModalThumb(si, ii) {
+  setTimeout(() => {
+    const slot = SLIDES[si]?.imgSlots?.[ii];
+    if (!slot) return;
+    const done = IMG_MAP[slot.code]?.dataUrl;
+    const el = document.getElementById(`mthumb-${SLIDES[si].slideNum}-${ii}`);
+    if (el && done) {
+      el.innerHTML = `<img src="${done}" alt="${slot.code}">`;
+      el.closest('.modal-slot')?.classList.add('slot-done');
+    }
+    // Also update badge in list
+    updateImgCount();
+    updateSlideRowBadge(si);
+  }, 200);
+}
+
+function updateSlideRowBadge(si) {
+  const slide = SLIDES[si];
+  if (!slide) return;
+  const imgDone = slide.imgSlots.filter(s => IMG_MAP[s.code]?.dataUrl).length;
+  const imgCount = slide.imgSlots.length;
+  const row = document.getElementById(`srow-${si}`);
+  if (!row) return;
+  const btn = row.querySelector('.badge-img');
+  if (btn) {
+    btn.textContent = `🖼 ${imgDone}/${imgCount}`;
+    btn.classList.toggle('badge-done', imgDone === imgCount);
+  }
+}
+
+// ═══ TEXT MODAL ═══
+function openTextModal(si) {
+  const slide = SLIDES[si];
+  if (!slide || !slide.textBlocks) return;
+  closeSlideModal();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'slide-modal-overlay';
+  overlay.id = 'slide-modal';
+  overlay.onclick = e => { if (e.target === overlay) closeSlideModal(); };
+
+  const blocksHtml = slide.textBlocks.map((tb, bi) => `
+    <div class="modal-text-block">
+      <label class="modal-tb-label">${tb.label || 'Nội dung ' + (bi + 1)}</label>
+      <textarea class="tb-edit" id="tblock-${slide.slideNum}-${bi}"
+        rows="${Math.min(Math.max(tb.text.split('\n').length, 2), 8)}"
+        placeholder="(trống)">${tb.text}</textarea>
+    </div>
+  `).join('');
+
+  // Auto fields
+  const tagsHtml = (slide.autoFields || []).map(f =>
+    `<span class="auto-tag">${AUTO_FIELD_LABELS[f] || f}: <strong>${getAutoValue(f)}</strong></span>`
+  ).join('');
+
+  overlay.innerHTML = `
+    <div class="slide-modal">
+      <div class="modal-header">
+        <h3>✏️ Nội dung — Slide ${slide.slideNum}: ${slide.title}</h3>
+        <button class="modal-close" onclick="closeSlideModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        ${tagsHtml ? `<div class="modal-tags">${tagsHtml}</div>` : ''}
+        ${blocksHtml}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+function closeSlideModal() {
+  const modal = document.getElementById('slide-modal');
+  if (modal) {
+    modal.classList.remove('show');
+    setTimeout(() => modal.remove(), 200);
+  }
 }
 
 // ─── REORDER SLIDES ───
@@ -248,8 +348,32 @@ function loadSlotImage(input,si,ii){
     checkImageQuality(e.target.result, si, ii);
 
     updateImgCount();
+    if (typeof refreshEditor === 'function') refreshEditor();
+
+    // ─── Sync image to collab ───
+    if (typeof SYNC_ACTIVE !== 'undefined' && SYNC_ACTIVE && typeof syncUploadImage === 'function') {
+      syncUploadImage(si, ii, file);
+    }
   };
   reader.readAsDataURL(file);
+}
+
+// Apply remote image (called from sync.js)
+function applyRemoteImage(si, ii, url, fileName) {
+  if (si >= SLIDES.length || ii >= (SLIDES[si].imgSlots?.length || 0)) return;
+  const slot = SLIDES[si].imgSlots[ii];
+  slot.realUrl = url;
+  slot.realName = fileName || 'remote.jpg';
+  IMG_MAP[slot.code] = { dataUrl: url };
+
+  const thumb = document.getElementById(`thumb-${SLIDES[si].slideNum}-${ii}`);
+  if (thumb) {
+    thumb.innerHTML = `<img src="${url}" alt="${fileName}" title="Click để xem lớn">`;
+    thumb.classList.add('thumb-replaced');
+  }
+  const stat = document.getElementById(`stat-${SLIDES[si].slideNum}-${ii}`);
+  if (stat) { stat.className = 'slot-status s-done'; stat.textContent = '\u2713 ' + (fileName || 'synced'); }
+  updateImgCount();
 }
 
 // Kiểm tra chất lượng ảnh upload vs kích thước slot
@@ -399,6 +523,10 @@ async function loadPptx(input){
   try{
     const buf=await file.arrayBuffer();
     PPTX_DATA=buf;
+    // Sync to team if in collab room
+    if (typeof syncUploadTemplate === 'function' && typeof SYNC_ACTIVE !== 'undefined' && SYNC_ACTIVE) {
+      syncUploadTemplate(file);
+    }
     const zip=await JSZip.loadAsync(buf);
     const slideFiles=Object.keys(zip.files).filter(k=>k.match(/^ppt\/slides\/slide\d+\.xml$/)).sort((a,b)=>{
       const na=parseInt(a.match(/\d+/)[0]),nb=parseInt(b.match(/\d+/)[0]);return na-nb;
@@ -515,6 +643,8 @@ async function loadPptx(input){
     buildPresentTable(SLIDES);
     // Init drag & drop sau khi render bảng
     initDragDrop();
+    // Cache to IndexedDB for F5 persistence
+    savePptxToCache(buf, file.name);
   } catch(e){
     console.error(e);
     document.getElementById('pptx-info').textContent='Lỗi đọc file: '+e.message;
@@ -522,6 +652,115 @@ async function loadPptx(input){
     initDragDrop();
   }
 }
+
+// ─── Reusable: parse PPTX from ArrayBuffer ───
+async function parsePptxFromBuffer(buf, fileName) {
+  PPTX_DATA = buf;
+  const zip = await JSZip.loadAsync(buf);
+  const slideFiles = Object.keys(zip.files).filter(k => k.match(/^ppt\/slides\/slide\d+\.xml$/)).sort((a, b) => {
+    return parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]);
+  });
+  const slides = [];
+  for (let i = 0; i < slideFiles.length; i++) {
+    const xml = await zip.files[slideFiles[i]].async('string');
+    let title = `Slide ${i + 1}`;
+    const tMatch = xml.match(/<p:sp>.*?<p:ph type="title".*?<a:t>(.*?)<\/a:t>/s);
+    if (tMatch) title = tMatch[1].replace(/<[^>]+>/g, '').trim();
+    else {
+      const texts = [...xml.matchAll(/<a:t>([\s\S]{1,80}?)<\/a:t>/g)].map(m => m[1].trim()).filter(t => t.length > 2);
+      if (texts[0]) title = texts[0];
+    }
+    // Reuse same image/text detection logic from loadPptx
+    const imgSlots = [];
+    const picMatches = [...xml.matchAll(/<p:pic>[\s\S]*?<\/p:pic>/g)];
+    const imgCount = picMatches.length;
+    const isDivider = imgCount === 0 && xml.includes('<p:ph type="title"');
+
+    picMatches.forEach((pm, ii) => {
+      const picXml = pm[0];
+      const extMatch = picXml.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+      const offMatch = picXml.match(/<a:off x="(\d+)" y="(\d+)"/);
+      const descMatch = picXml.match(/<p:cNvPr[^>]*descr="([^"]*)"/);
+      const nameMatch = picXml.match(/<p:cNvPr[^>]*name="([^"]*)"/);
+      const w = extMatch ? Math.round(parseInt(extMatch[1]) / 914400 * 96) : 400;
+      const h = extMatch ? Math.round(parseInt(extMatch[2]) / 914400 * 96) : 300;
+      const label = descMatch ? descMatch[1] : (nameMatch ? nameMatch[1] : `Ảnh ${ii + 1}`);
+      imgSlots.push({
+        code: `S${i + 1}_IMG${ii + 1}`,
+        label, pxW: w, pxH: h,
+        px300W: extMatch ? Math.round(parseInt(extMatch[1]) / 914400 * 300) : 0,
+        px300H: extMatch ? Math.round(parseInt(extMatch[2]) / 914400 * 300) : 0,
+      });
+    });
+
+    // Text blocks
+    const textBlocks = [];
+    const spMatches = [...xml.matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)];
+    for (const spM of spMatches) {
+      const spXml = spM[1];
+      if (/<p:ph/.test(spXml)) continue;
+      if (/<a:blipFill/.test(spXml)) continue;
+      const paragraphs = [];
+      let pMatch;
+      const pRegex = /<a:p[^>]*>([\s\S]*?)<\/a:p>/g;
+      while ((pMatch = pRegex.exec(spXml)) !== null) {
+        const pText = [...pMatch[1].matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map(m => m[1]).join('');
+        if (pText.length > 0) paragraphs.push(pText);
+      }
+      const fullText = paragraphs.join('\n');
+      if (fullText.trim().length > 0) {
+        const shapeName = (spXml.match(/<p:cNvPr[^>]*name="([^"]*)"/) || ['', ''])[1];
+        textBlocks.push({ shapeName, text: fullText, originalText: fullText });
+      }
+    }
+
+    slides.push({ slideNum: i + 1, title, section: '', isDivider: isDivider && imgCount === 0, imgSlots, textBlocks, autoFields: [], note: '' });
+  }
+  SLIDES = slides;
+  document.getElementById('pptx-info').textContent = (fileName || 'Template') + ' — ' + slides.length + ' slides';
+  buildPresentTable(SLIDES);
+  initDragDrop();
+  savePptxToCache(buf, fileName);
+}
+
+// ─── IndexedDB: persist PPTX across F5 ───
+function savePptxToCache(buf, fileName) {
+  const req = indexedDB.open('c2_pptx', 1);
+  req.onupgradeneeded = e => e.target.result.createObjectStore('files');
+  req.onsuccess = e => {
+    const db = e.target.result;
+    const tx = db.transaction('files', 'readwrite');
+    tx.objectStore('files').put({ buf, fileName, savedAt: Date.now() }, 'template');
+  };
+}
+
+function loadPptxFromCache() {
+  return new Promise(resolve => {
+    const req = indexedDB.open('c2_pptx', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('files');
+    req.onsuccess = e => {
+      const db = e.target.result;
+      const tx = db.transaction('files', 'readonly');
+      const getReq = tx.objectStore('files').get('template');
+      getReq.onsuccess = () => resolve(getReq.result || null);
+      getReq.onerror = () => resolve(null);
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+
+// ─── Auto-restore on page load ───
+document.addEventListener('DOMContentLoaded', async () => {
+  const cached = await loadPptxFromCache();
+  if (cached && cached.buf) {
+    try {
+      await parsePptxFromBuffer(cached.buf, cached.fileName);
+      console.log('[PPTX] Restored from cache:', cached.fileName);
+    } catch (e) {
+      console.warn('[PPTX] Cache restore failed:', e);
+    }
+  }
+});
 
 // ════════════════════════════════════════════════════════
 // DATA SLIDE GENERATOR (PptxGenJS)

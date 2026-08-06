@@ -16,6 +16,7 @@
 <script src="libs/exceljs.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -44,6 +45,11 @@
       <span class="step-number">3</span>
       <span class="step-label">Trình bày</span>
     </div>
+    <div class="step-line"></div>
+    <div class="step-item" data-page="p4" onclick="goPage('p4',this)">
+      <span class="step-number">4</span>
+      <span class="step-label">Xem slide</span>
+    </div>
   </div>
 
   <div class="nav-right">
@@ -53,6 +59,8 @@
       <span class="sync-label" id="sync-label">Offline</span>
       <span class="sync-room-id" id="sync-room-info"></span>
     </div>
+    <button class="btn btn-ghost" id="drive-link-btn" onclick="linkDriveFolder()" title="Liên kết thư mục Google Drive">📁 Liên kết thư mục</button>
+    <span id="drive-status" class="drive-status" style="display:none"></span>
     <button class="btn btn-ghost" onclick="showRoomDialog()" title="Làm việc nhóm"><i data-lucide="users" style="width:14px;height:14px"></i> Collab</button>
     <button class="btn btn-ghost" onclick="newProject()" title="Tạo dự án mới">+ Mới</button>
     <button class="btn btn-ghost" onclick="openProject()" title="Mở file .json">Mở</button>
@@ -275,15 +283,19 @@
 <div id="p3" class="page p3">
   <div class="p3-topbar">
     <h2>Trình bày — Ghép ảnh theo mẫu</h2>
-    <label class="upload-zone">
-      <input type="file" id="pptx-upload" accept=".pptx" onchange="loadPptx(this)">
-      Upload file .pptx mẫu
-    </label>
+    <div class="template-selector">
+      <button class="btn btn-primary" onclick="loadBuiltinTemplate('16x9')" id="btn-tpl-16x9">📐 Template 16:9</button>
+      <button class="btn btn-primary" onclick="loadBuiltinTemplate('a3')" id="btn-tpl-a3">📄 Template A3</button>
+      <label class="upload-zone" style="display:inline-block;margin:0;padding:6px 14px;font-size:12px">
+        <input type="file" id="pptx-upload" accept=".pptx" onchange="loadPptx(this)">
+        Upload file khác
+      </label>
+    </div>
     <label class="upload-zone" id="img-folder-btn" style="display:none">
       <input type="file" id="img-folder" multiple accept="image/*" onchange="loadImageFolder(this)">
       Load thư mục ảnh
     </label>
-    <div id="pptx-info" class="pptx-info">Chưa có file mẫu</div>
+    <div id="pptx-info" class="pptx-info">Chọn template để bắt đầu</div>
     <div class="p3-actions">
       <button class="btn btn-ghost" onclick="insertDataSlide()" id="btn-insert-data" style="display:none">Chèn slide Quy mô</button>
       <button class="btn btn-ghost" onclick="resetPresent()">Reset</button>
@@ -294,8 +306,8 @@
   <div class="p3-body">
     <div id="p3-empty" class="p3-empty">
       <div class="empty-icon"><i data-lucide="file-text" style="width:48px;height:48px;color:var(--text-3)"></i></div>
-      <div class="empty-title">Upload file .pptx mẫu để bắt đầu</div>
-      <div class="empty-desc">Web sẽ đọc cấu trúc slide, tạo bảng quản lý ảnh và ghép số liệu từ module Quy mô</div>
+      <div class="empty-title">Chọn template ở trên để bắt đầu</div>
+      <div class="empty-desc">Hoặc upload file .pptx riêng. Web sẽ đọc cấu trúc slide, tạo bảng quản lý ảnh và ghép số liệu.</div>
     </div>
 
     <div id="p3-content" style="display:none">
@@ -311,11 +323,11 @@
       <table class="slide-table" id="slide-table">
         <thead>
           <tr>
-            <th style="width:220px">Trang / Slide</th>
-            <th style="width:140px">Ảnh mẫu (thumbnail)</th>
-            <th style="width:120px">Mã file ảnh</th>
-            <th style="width:160px">Ảnh thực tế (upload)</th>
-            <th>Nội dung bổ sung / Số liệu tự điền</th>
+            <th style="width:30%">Trang / Slide</th>
+            <th>Ảnh mẫu (thumbnail)</th>
+            <th style="width:80px;text-align:center">Upload</th>
+            <th style="width:80px;text-align:center">Nội dung</th>
+            <th style="width:25%">Ghi chú</th>
           </tr>
         </thead>
       </table>
@@ -329,14 +341,51 @@
   </div>
 </div>
 
+<!-- ═══════════════════════ PAGE 4: XEM SLIDE ═══════════════════════ -->
+<div id="p4" class="page p4">
+  <div id="p4-empty" class="p4-empty" style="display:flex">
+    <div style="font-size:48px;margin-bottom:12px">&#128444;</div>
+    <h3 style="margin:0 0 8px">Chưa có dữ liệu slide</h3>
+    <p style="color:var(--text-3);margin:0 0 16px">Upload file PPTX ở trang <b>Trình bày</b> trước, sau đó quay lại đây.</p>
+    <button class="btn btn-primary" onclick="goPage('p3',document.querySelector('[data-page=p3]'))">Qua trang Trình bày →</button>
+  </div>
+
+  <div id="p4-content" class="p4-content" style="display:none">
+    <!-- Filmstrip sidebar -->
+    <div class="filmstrip-wrap">
+      <div class="filmstrip-header">Slides</div>
+      <div class="filmstrip" id="filmstrip"></div>
+    </div>
+
+    <!-- Main preview -->
+    <div class="editor-main">
+      <div class="editor-topbar">
+        <button class="btn btn-ghost" onclick="navigateSlide(-1,false)" title="Slide trước">◀</button>
+        <span id="editor-nav-info" class="editor-nav-info">Slide 1 / 1</span>
+        <button class="btn btn-ghost" onclick="navigateSlide(1,false)" title="Slide sau">▶</button>
+        <span id="editor-slide-title" class="editor-slide-title"></span>
+        <span id="img-done-info" class="img-done-info"></span>
+      </div>
+      <div class="slide-canvas-wrap">
+        <div class="slide-canvas" id="slide-canvas">
+          <div class="slide-empty">Chọn slide từ danh sách bên trái</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="js/data.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/present.js"></script>
 <script src="js/excel.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/drive.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 <script>lucide.createIcons();</script>
+<script>var IMG_MAP = IMG_MAP || {};</script>
 
 </body>
 </html>

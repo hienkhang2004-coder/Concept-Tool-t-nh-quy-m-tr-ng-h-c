@@ -35,6 +35,11 @@ function goPage(id, btn) {
   if (id === 'p2' && typeof renderCharts === 'function') {
     requestAnimationFrame(() => renderCharts());
   }
+  if (id === 'p4' && typeof initEditor === 'function') {
+    requestAnimationFrame(() => initEditor());
+  }
+  // Sync current page to collab
+  if (typeof syncPresencePage === 'function') syncPresencePage(id);
 }
 
 function switchTab(e, id) {
