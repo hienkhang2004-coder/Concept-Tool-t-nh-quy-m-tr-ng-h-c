@@ -1,0 +1,251 @@
+<title>Theo dõi Dự án</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap">
+<style>
+/* Layout: a site-office register — summary strip of status counts, then one dense, scannable table; editing happens in a side sheet. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --line:#d9dfe5; --fg:#16212b; --muted:#5b6a78;
+  --accent:#1d5b86; --accent-fg:#ffffff; --accent-soft:#e3eef6;
+  --ok:#1f7a4d; --ok-soft:#e1f2e8; --warn:#9a5b00; --warn-soft:#fbefd9; --bad:#b03a2e; --bad-soft:#f8e3e0; --idle:#5b6a78; --idle-soft:#e9edf1;
+  --shade:rgba(16,24,32,.38);
+  --f-body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10161c; --surface:#172029; --line:#2a3642; --fg:#e4eaf0; --muted:#93a2b0;
+  --accent:#6fb0e0; --accent-fg:#0d1720; --accent-soft:#1b3346;
+  --ok:#6fcf9a; --ok-soft:#173527; --warn:#e8b45c; --warn-soft:#3a2d14; --bad:#ef8a7e; --bad-soft:#3d1d1a; --idle:#a2b0bd; --idle-soft:#24303b;
+  --shade:rgba(0,0,0,.55); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10161c; --surface:#172029; --line:#2a3642; --fg:#e4eaf0; --muted:#93a2b0;
+  --accent:#6fb0e0; --accent-fg:#0d1720; --accent-soft:#1b3346;
+  --ok:#6fcf9a; --ok-soft:#173527; --warn:#e8b45c; --warn-soft:#3a2d14; --bad:#ef8a7e; --bad-soft:#3d1d1a; --idle:#a2b0bd; --idle-soft:#24303b;
+  --shade:rgba(0,0,0,.55); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:28px 48px;display:grid;gap:20px}
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{margin:4px 0 0;font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;font-weight:500}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+.danger{color:var(--bad);border-color:var(--bad)}
+.stats{display:flex;flex-wrap:wrap;gap:8px}
+.stat{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);cursor:pointer;color:var(--fg)}
+.stat[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.stat b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.search{flex:1 1 260px;max-width:420px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;min-width:980px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--accent-soft)}
+td.stt{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);width:52px}
+td.name{font-weight:600;min-width:200px}
+.note{color:var(--muted);font-size:13px;max-width:280px}
+.when{display:block;font-size:11.5px;color:var(--muted);font-family:var(--f-mono);margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-chuan-bi{color:var(--idle);background:var(--idle-soft)}
+.s-dang-thi-cong{color:var(--accent);background:var(--accent-soft)}
+.s-cham-tien-do{color:var(--bad);background:var(--bad-soft)}
+.s-tam-dung{color:var(--warn);background:var(--warn-soft)}
+.s-hoan-thanh{color:var(--ok);background:var(--ok-soft)}
+.empty{padding:48px 16px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center}
+.empty strong{color:var(--fg);font-size:16px}
+.msg{font-size:13px;color:var(--muted)}
+/* sheet */
+.shade{position:fixed;inset:0;background:var(--shade);display:flex;justify-content:flex-end;z-index:10}
+.sheet{width:min(460px,100%);height:100%;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.sheet-head h2{margin:0;font-size:17px}
+form{padding:18px 20px;display:grid;gap:14px;overflow-y:auto;flex:1}
+label{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+textarea{min-height:96px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:480px){.row2{grid-template-columns:1fr}}
+.sheet-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--line)}
+.sheet-foot .right{display:flex;gap:8px;margin-left:auto}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:8px;font-weight:500;z-index:20}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Sổ theo dõi</div>
+      <h1>Tình hình dự án</h1>
+      <p class="sub" id="sub">Đang tải dữ liệu…</p>
+    </div>
+    <button class="primary" id="addBtn" type="button">+ Thêm dự án</button>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tools">
+    <input class="search" id="q" type="search" placeholder="Tìm theo tên, địa điểm, chủ đầu tư, nhân sự…" aria-label="Tìm kiếm">
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="tablebox">
+    <table>
+      <thead><tr>
+        <th>STT</th><th>Tên dự án</th><th>Địa điểm</th><th>Chủ đầu tư</th><th>Trưởng ban</th><th>Chủ nhiệm triển khai</th><th>Tình trạng</th><th>Cập nhật gần nhất</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>
+      <strong>Chưa có dự án nào</strong>
+      <span>Bấm “Thêm dự án” để nhập dự án đầu tiên. Mọi người mở trang này sẽ thấy cùng danh sách.</span>
+    </div>
+  </div>
+</div>
+
+<div class="shade" id="shade" hidden>
+  <aside class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Thêm dự án</h2>
+      <button type="button" id="closeBtn" aria-label="Đóng">✕</button>
+    </div>
+    <form id="form" autocomplete="off">
+      <label>Tên dự án<input id="f-name" required></label>
+      <label>Địa điểm<input id="f-location"></label>
+      <label>Chủ đầu tư<input id="f-investor"></label>
+      <div class="row2">
+        <label>Trưởng ban<input id="f-head"></label>
+        <label>Chủ nhiệm triển khai<input id="f-manager"></label>
+      </div>
+      <div class="row2">
+        <label>Tình trạng
+          <select id="f-status"></select>
+        </label>
+        <label>STT<input id="f-order" type="number" min="1" step="1"></label>
+      </div>
+      <label>Cập nhật tình hình<textarea id="f-note" placeholder="Ví dụ: Hoàn thành đổ bê tông sàn tầng 3, đang lắp dựng cốp pha tầng 4."></textarea></label>
+    </form>
+    <div class="sheet-foot">
+      <div id="delZone"></div>
+      <div class="right">
+        <button type="button" id="cancelBtn">Hủy</button>
+        <button type="submit" form="form" class="primary" id="saveBtn">Lưu</button>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const STATUSES=[
+  {k:"chuan-bi",t:"Chuẩn bị",c:"var(--idle)"},
+  {k:"dang-thi-cong",t:"Đang thi công",c:"var(--accent)"},
+  {k:"cham-tien-do",t:"Chậm tiến độ",c:"var(--bad)"},
+  {k:"tam-dung",t:"Tạm dừng",c:"var(--warn)"},
+  {k:"hoan-thanh",t:"Hoàn thành",c:"var(--ok)"}
+];
+const $=id=>document.getElementById(id);
+let db=null, col=null, projects=[], filter=null, editing=null, canWrite=true, saving=false;
+
+$("f-status").innerHTML=STATUSES.map(s=>`<option value="${s.k}">${s.t}</option>`).join("");
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function fmt(ts){if(!ts)return"";const d=new Date(ts);if(isNaN(d))return"";const p=n=>String(n).padStart(2,"0");return`${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`}
+function stat(k){return STATUSES.find(s=>s.k===k)||STATUSES[0]}
+function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2200)}
+function norm(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").replace(/Đ/g,"D").toLowerCase()}
+
+function sorted(){return projects.slice().sort((a,b)=>(a.order??1e9)-(b.order??1e9)||String(a.createdAt||"").localeCompare(String(b.createdAt||"")))}
+
+function render(){
+  const all=sorted();
+  const counts={};all.forEach(p=>counts[p.status||"chuan-bi"]=(counts[p.status||"chuan-bi"]||0)+1);
+  $("sub").textContent=db?`${all.length} dự án · dữ liệu dùng chung cho mọi người mở trang`:"Không kết nối được kho dữ liệu dùng chung.";
+  $("stats").innerHTML=`<button type="button" class="stat" data-k="" aria-pressed="${filter===null}">Tất cả <b>${all.length}</b></button>`+
+    STATUSES.map(s=>`<button type="button" class="stat" data-k="${s.k}" aria-pressed="${filter===s.k}"><span class="dot" style="background:${s.c}"></span>${s.t} <b>${counts[s.k]||0}</b></button>`).join("");
+  const q=norm($("q").value.trim());
+  const list=all.map((p,i)=>({...p,stt:i+1})).filter(p=>(!filter||(p.status||"chuan-bi")===filter)&&(!q||norm([p.name,p.location,p.investor,p.head,p.manager,p.note].join(" ")).includes(q)));
+  $("rows").innerHTML=list.map(p=>{const s=stat(p.status);return`<tr data-id="${esc(p.id)}" tabindex="0">
+    <td class="stt">${p.stt}</td><td class="name">${esc(p.name)}</td><td>${esc(p.location)}</td><td>${esc(p.investor)}</td>
+    <td>${esc(p.head)}</td><td>${esc(p.manager)}</td>
+    <td><span class="pill s-${s.k}">${s.t}</span></td>
+    <td class="note">${esc(p.note)||"—"}<span class="when">${fmt(p.updatedAt)}</span></td></tr>`}).join("");
+  $("empty").hidden=all.length>0;
+  $("msg").textContent=all.length&&!list.length?"Không có dự án nào khớp.":"";
+}
+
+$("stats").addEventListener("click",e=>{const b=e.target.closest(".stat");if(!b)return;filter=b.dataset.k||null;render()});
+$("q").addEventListener("input",render);
+$("rows").addEventListener("click",e=>{const tr=e.target.closest("tr");if(tr)openSheet(tr.dataset.id)});
+$("rows").addEventListener("keydown",e=>{if(e.key==="Enter"){const tr=e.target.closest("tr");if(tr)openSheet(tr.dataset.id)}});
+
+function openSheet(id){
+  editing=id?projects.find(p=>p.id===id):null;
+  const p=editing||{};
+  $("sheetTitle").textContent=editing?"Cập nhật dự án":"Thêm dự án";
+  $("f-name").value=p.name||"";$("f-location").value=p.location||"";$("f-investor").value=p.investor||"";
+  $("f-head").value=p.head||"";$("f-manager").value=p.manager||"";$("f-status").value=p.status||"chuan-bi";
+  $("f-order").value=editing?(sorted().findIndex(x=>x.id===id)+1):(projects.length+1);
+  $("f-note").value=p.note||"";
+  $("delZone").innerHTML=editing&&canWrite?`<button type="button" class="danger" id="delBtn">Xóa</button>`:"";
+  [...$("form").elements].forEach(el=>el.disabled=!canWrite);$("saveBtn").hidden=!canWrite;
+  $("shade").hidden=false;$("f-name").focus();
+}
+function closeSheet(){$("shade").hidden=true;editing=null}
+$("closeBtn").onclick=closeSheet;$("cancelBtn").onclick=closeSheet;
+$("shade").addEventListener("click",e=>{if(e.target===$("shade"))closeSheet()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("shade").hidden)closeSheet()});
+$("addBtn").onclick=()=>openSheet(null);
+
+$("delZone").addEventListener("click",async e=>{
+  if(e.target.id==="delBtn"){$("delZone").innerHTML=`<span class="confirm">Xóa dự án này? <button type="button" class="danger" id="delYes">Xóa hẳn</button><button type="button" id="delNo">Không</button></span>`;return}
+  if(e.target.id==="delNo"){$("delZone").innerHTML=`<button type="button" class="danger" id="delBtn">Xóa</button>`;return}
+  if(e.target.id==="delYes"&&editing){
+    try{await col.doc(editing.id).delete();await renumber(sorted().filter(x=>x.id!==editing.id));closeSheet();toast("Đã xóa dự án")}
+    catch(err){toast("Không xóa được: "+(err.message||err.code))}
+  }
+});
+
+// Ghi lại STT 1..n theo thứ tự, chỉ ghi những dòng đổi số
+async function renumber(list){for(let i=0;i<list.length;i++){if(list[i].order!==i+1){await col.doc(list[i].id).update({order:i+1})}}}
+
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();if(!col||saving)return;
+  const name=$("f-name").value.trim();if(!name){$("f-name").focus();return}
+  saving=true;$("saveBtn").disabled=true;
+  const now=new Date().toISOString();
+  const body={name,location:$("f-location").value.trim(),investor:$("f-investor").value.trim(),head:$("f-head").value.trim(),manager:$("f-manager").value.trim(),status:$("f-status").value,note:$("f-note").value.trim(),updatedAt:now};
+  try{
+    const list=sorted();let id;
+    if(editing){id=editing.id;await col.doc(id).update(body)}
+    else{const ref=col.doc();id=ref.id;await ref.set({...body,createdAt:now,order:list.length+1})}
+    // xếp lại theo STT người dùng nhập
+    const want=Math.max(1,Math.min(parseInt($("f-order").value)||list.length+1,list.length+(editing?0:1)));
+    const rest=list.filter(x=>x.id!==id);const me={id,order:-1};rest.splice(want-1,0,me);
+    await renumber(rest);
+    closeSheet();toast(editing?"Đã lưu cập nhật":"Đã thêm dự án");
+  }catch(err){
+    if(err&&err.code==="invalid_argument"){canWrite=false;toast("Bạn chỉ có quyền xem trang này")}
+    else if(err&&err.code==="quota_exceeded"){toast("Kho dữ liệu đã đầy, hãy xóa bớt dự án cũ")}
+    else toast("Không lưu được, thử lại sau")
+  }finally{saving=false;$("saveBtn").disabled=false}
+});
+
+render();
+(async()=>{
+  try{
+    const user=await window.claude?.use?.("user");
+    if(user){const w=await user.can?.("data.write");if(w===false)canWrite=false}
+    $("addBtn").hidden=!canWrite;
+    db=await window.claude?.use?.("db");
+    if(!db){render();$("addBtn").hidden=true;return}
+    col=db.collection("projects");
+    col.onSnapshot(s=>{projects=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{$("sub").textContent="Mất kết nối dữ liệu. Tải lại trang để thử lại."});
+  }catch(e){render()}
+})();
+</script>
